@@ -1,0 +1,43 @@
+{
+  "n_train_rows": 7473,
+  "n_eval_items": 1527,
+  "n_lgmt": 1200,
+  "eval_frac": 0.2,
+  "seed": 0,
+  "train_by_family": {
+    "lsat_lr": 1218,
+    "logiqa": 1130,
+    "arct": 1025,
+    "folio": 1292,
+    "logicnli": 1615,
+    "proverqa": 1193
+  },
+  "train_by_mode": {
+    "mcq": 3373,
+    "frq": 4100
+  },
+  "train_by_format_type": {
+    "MCQ-lsat_lr": 1218,
+    "MCQ-logiqa": 1130,
+    "MCQ-arct": 1025,
+    "FRQ-entailment": 4100
+  },
+  "proverqa_by_difficulty": {
+    "medium": 600,
+    "hard": 593
+  },
+  "eval_by_family": {
+    "lsat_lr": 282,
+    "logiqa": 270,
+    "arct": 275,
+    "folio": 208,
+    "logicnli": 285,
+    "proverqa": 207
+  },
+  "eval_neutral_gold": 243,
+  "trace_source": {
+    "grounded_template": 5752,
+    "solver_path": 976,
+    "prover_chain": 745
+  }
+}

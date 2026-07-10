@@ -1,0 +1,18 @@
+# Colab already ships a CUDA build of torch — do NOT reinstall it here.
+# The notebook's install cell runs these:
+transformers>=4.51
+peft>=0.11
+accelerate>=0.30
+safetensors>=0.4
+bitsandbytes>=0.43   # 4-bit QLoRA (CUDA only)
+
+# judge fallback + Step B verbalizer (Claude API via .env ANTHROPIC_API_KEY)
+anthropic>=0.40
+
+# symbolic FOL solver (data_construction/fol_solver.py) — used at CORPUS-BUILD time for the
+# FOLIO/ProverQA solver working-paths, and by Step B. Absent -> those rows fall back to templates.
+z3-solver>=4.12
+
+# Qwen3.5 linear-attention fast path (~10x train speedup); optional, Triton-based.
+# Full path also wants causal-conv1d, which needs the CUDA dev toolkit (nvcc) to build.
+flash-linear-attention>=0.1

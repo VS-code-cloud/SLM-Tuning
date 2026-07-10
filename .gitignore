@@ -1,0 +1,44 @@
+# KEEP all data the trainer/eval actually reads (this is the point of the repo):
+#   data/sft_train.jsonl, data/eval_items.json, data/corpus_meta.json,
+#   data/sft_train_stepb.jsonl (Step B). Only rebuild-only sources + transient
+#   caches are ignored. Everything under data/ is tracked EXCEPT data/_raw/.
+
+# ---- secrets (never commit; .env.example is the template) ----
+.env
+.env.*
+!.env.example
+
+# ---- raw source datasets: rebuild-only, not redistributable (ReClor password zip,
+#      per-dataset licenses). NOT used by training/eval (only build_corpus reads them).
+#      Re-download per ../critical-reasoning-eval/SOURCES.md ----
+data/_raw/*
+# ...but KEEP the FOLIO-train conclusion-FOL cache (real Haiku-gateway cost to rebuild).
+# NB: ignore the CONTENTS (data/_raw/*), not the dir, or this negation can't re-include it.
+!data/_raw/folio_train_concl_fol.json
+
+# ---- model outputs / training artifacts (large, regenerable) ----
+# (.gitignore has NO inline comments — keep patterns on their own lines)
+runs/
+checkpoints/
+adapter/
+*.safetensors
+*.bin
+*.pt
+*.ckpt
+
+# ---- personal / scratch runners (supervisor.sh is the documented driver; it stays tracked) ----
+overnight.sh
+suite.sh
+
+# ---- transient cache write artifacts ----
+*.tmp
+*.bak
+
+# ---- Python / editor / OS junk ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+.DS_Store
+*.swp
