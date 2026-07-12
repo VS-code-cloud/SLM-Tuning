@@ -7,6 +7,7 @@ answer** — an option letter (MCQ) or an entailment label `True / False /
 Uncertain|Unknown`, *including* the neutral "does-not-follow" class. No dependency on
 the parent repo; the SFT data (traces already generated) and the prompt/grading
 contract are bundled here.
+Note: see data-synthesis.md for data making methods
 
 ## Contents
 
