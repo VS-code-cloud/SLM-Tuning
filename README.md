@@ -173,9 +173,9 @@ the **v2** slice; **v1 (0.6B) used a different, smaller slice** and is not direc
 
 ---
 
-## Results at a glance — the two SFT runs (DOK style)
+## Results at a glance — the two SFT runs
 
-**DOK-1 — facts.** Base-vs-tuned, deterministic grading, two regimes never merged.
+Base-vs-tuned, deterministic grading, two regimes never merged.
 **v1** = Qwen3-0.6B (LoRA, 250 upd, 25 items/family, pre-stratified sampling).
 **v2** = Qwen3.5-4B (4-bit QLoRA, **partial: 400/1943 updates ≈ 21% of epoch 1**, 10
 items/family, stratified). Different bases *and* slices → read the **direction and size
@@ -197,7 +197,7 @@ Per-family accuracy (base → tuned; Opus 4.8 shown as the ceiling):
 | lsat_lr | 20 → 32 | 80 → **90** | 90 |
 | proverqa | 56 → 92 | 60 → **90** | 100 |
 
-**DOK-2 — findings.**
+**Findings.**
 - **v2 closes ≈64% of the base→Opus accuracy gap at 21% of one epoch** (58.3 → 81.7 vs
   Opus 95.0). Every family improves; biggest lifts on the MCQ satellite (logiqa 70→100,
   arct 40→80) and proverqa 60→90.
