@@ -106,6 +106,32 @@ def verify(response: str, row: dict) -> bool:
     return S.labels_equiv(S.parse_label(response), gold)
 
 
+# FRQ style constraint: keep the label word (True/False/Uncertain/Unknown) OUT of the
+# reasoning body so the ONLY label token is the committing final sentence (the whole corpus
+# relies on this last-label-hit invariant; free-form teacher traces otherwise scatter labels
+# mid-reasoning and teach hedging/multi-label output — measured to hurt commitment + LGMT MVR).
+NO_LABEL_FRQ = ("\n\nSTYLE REQUIREMENT: In your reasoning, do NOT use the words \"true\", "
+                "\"false\", \"uncertain\", or \"unknown\" — refer to it as \"the statement\" and "
+                "describe what does or does not follow from the premises. State your verdict in "
+                "ONE final sentence ONLY, formatted exactly: \"Therefore, the statement is X.\" "
+                "where X is True, False, or Uncertain (use Unknown only if the options say so).")
+
+# MCQ analog: the option LETTER is the label. Keep it out of the reasoning body (refer to
+# options by content) so the only letter token is the committing final sentence — same
+# last-hit-parse invariant that FRQ needs (parse_letter also takes the LAST letter / the last
+# "option X" phrase, so a mid-reasoning "Option A is wrong" would otherwise pollute it).
+NO_LETTER_MCQ = ("\n\nSTYLE REQUIREMENT: In your reasoning, refer to the options by their CONTENT, "
+                 "NOT by their letter — do not write any option letter (A, B, C, D, E) or the word "
+                 "\"option\" until the very end. State your choice in ONE final sentence ONLY, "
+                 "formatted exactly: \"Therefore, the correct option is (X).\"")
+
+
+def blind_prompt(row: dict) -> str:
+    """Blind solve prompt (no gold), with the style constraint that keeps the label/letter
+    out of the reasoning body (FRQ: no True/False/…; MCQ: no option letters until the end)."""
+    return row["prompt"] + (NO_LABEL_FRQ if row["mode"] == "frq" else NO_LETTER_MCQ)
+
+
 def backfill_prompt(row: dict) -> str:
     """Answer-conditioned: hand the teacher the gold answer, ask for a natural,
     rigorous justification in the house style (reason first, commit last)."""
@@ -116,7 +142,8 @@ def backfill_prompt(row: dict) -> str:
     return (row["prompt"] + f"\n\n(For reference, {goal}.) Write a rigorous, natural "
             "explanation that derives this from the given information — reason step by "
             "step, then end by clearly committing to the answer. Do not mention that the "
-            "answer was given to you; reason as if solving it.")
+            "answer was given to you; reason as if solving it."
+            + (NO_LABEL_FRQ if row["mode"] == "frq" else NO_LETTER_MCQ))
 
 
 def reread_prompt(reasoning: str, row: dict) -> str:
@@ -145,7 +172,7 @@ def reword_prompt(row: dict) -> str:
             + row["completion"])
 
 
-def process_row(row: dict, opus: str, haiku: str, reread_model: str, timeout: int,
+def process_row(row: dict, opus: str, sonnet: str, haiku: str, reread_model: str, timeout: int,
                 folio_fol: dict | None = None):
     """Produce (record, stat) for one row. Routing (cheap model wherever a derivation
     exists, Opus only where reasoning must be generated from scratch):
@@ -176,17 +203,23 @@ def process_row(row: dict, opus: str, haiku: str, reread_model: str, timeout: in
                 return {**row, "completion": strip_meta(gen), "trace_source": "solver"}, "solver"
         # else: fall through to Opus generate below
 
-    # no-trace families -> Opus generates and must land on gold
-    blind = S.call_agent(row["prompt"], opus, timeout)
-    if blind and verify(blind, row):
-        return {**row, "completion": strip_meta(blind), "trace_source": "blind"}, "blind"
-    if blind is None:
+    # no-trace families -> ESCALATION CASCADE (cheapest teacher that lands on gold wins):
+    #   1) Sonnet blind  2) Opus blind  3) Opus answer-conditioned + blind re-read gate.
+    # Each blind trace is kept only if the teacher commits to gold UNPROMPTED (faithful).
+    bp = blind_prompt(row)
+    s = S.call_agent(bp, sonnet, timeout)                       # tier 1: cheap
+    if s and verify(s, row):
+        return {**row, "completion": strip_meta(s), "trace_source": "blind", "teacher": "sonnet"}, "sonnet_blind"
+    o = S.call_agent(bp, opus, timeout)                         # tier 2
+    if o and verify(o, row):
+        return {**row, "completion": strip_meta(o), "trace_source": "blind", "teacher": "opus"}, "opus_blind"
+    if s is None and o is None:                                 # gateway down -> keep template
         return {**row, "completion": completion, "trace_source": "deterministic"}, "no_teacher"
-    bf = S.call_agent(backfill_prompt(row), opus, timeout)
+    bf = S.call_agent(backfill_prompt(row), opus, timeout)      # tier 3: answer-conditioned
     if bf and verify(bf, row):
         reread = S.call_agent(reread_prompt(strip_meta(bf), row), reread_model, timeout)
         if reread and verify(reread, row):
-            return {**row, "completion": strip_meta(bf), "trace_source": "backfill"}, "backfill"
+            return {**row, "completion": strip_meta(bf), "trace_source": "backfill", "teacher": "opus"}, "backfill"
         return {**row, "completion": completion, "trace_source": "deterministic"}, "reread_failed"
     return {**row, "completion": completion, "trace_source": "deterministic"}, "backfill_failed"
 
@@ -197,7 +230,9 @@ def main() -> int:
     ap.add_argument("--in", dest="inp", default=str(DATA / "sft_train.jsonl"))
     ap.add_argument("--out", default=str(DATA / "sft_train_stepb.jsonl"))
     ap.add_argument("--opus-model", default="claude-opus-4-8",
-                    help="model that GENERATES traces for the no-logic-trace families")
+                    help="strong model — tier 2 blind + tier 3 answer-conditioned")
+    ap.add_argument("--sonnet-model", default="claude-sonnet-4-6",
+                    help="cheaper model tried FIRST (tier 1 blind) in the escalation cascade")
     ap.add_argument("--haiku-model", default="claude-haiku-4-5",
                     help="cheap model that REWORDS shipped chains (ProverQA)")
     ap.add_argument("--reread-model", default=S.DEFAULT_JUDGE_MODEL,
@@ -242,8 +277,9 @@ def main() -> int:
 
     with cache_path.open("a", encoding="utf-8") as cache_fh:
         with cf.ThreadPoolExecutor(max_workers=max(1, args.concurrency)) as ex:
-            futs = {ex.submit(process_row, r, args.opus_model, args.haiku_model,
-                              args.reread_model, args.timeout, folio_fol): r for r in pending}
+            futs = {ex.submit(process_row, r, args.opus_model, args.sonnet_model,
+                              args.haiku_model, args.reread_model, args.timeout, folio_fol): r
+                    for r in pending}
             done = 0
             for fut in cf.as_completed(futs):
                 try:
@@ -266,9 +302,11 @@ def main() -> int:
     with Path(args.out).open("w", encoding="utf-8") as fh:
         for r in out_rows:
             fh.write(json.dumps(r, ensure_ascii=False) + "\n")
-    frontier = stats["blind"] + stats["backfill"] + stats["reword"] + stats["solver"]
+    frontier = (stats["sonnet_blind"] + stats["opus_blind"] + stats["blind"] + stats["backfill"]
+                + stats["reword"] + stats["solver"])
     print(f"\n[stepb] wrote {len(out_rows)} rows -> {args.out}")
-    print(f"  frontier: {frontier} (Opus blind {stats['blind']} + backfill {stats['backfill']} "
+    print(f"  frontier: {frontier} (Sonnet blind {stats['sonnet_blind']} + Opus blind "
+          f"{stats['opus_blind'] + stats['blind']} + Opus backfill {stats['backfill']} "
           f"+ Haiku reword {stats['reword']} + solver+Haiku {stats['solver']})")
     print(f"  kept deterministic: {len(out_rows) - frontier - stats['cached']} (this run)  {dict(stats)}")
     if stats["no_teacher"]:

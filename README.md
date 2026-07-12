@@ -21,8 +21,11 @@ contract are bundled here.
 | `data_construction/` | **corpus-build / FOL cluster** (see below); writes `data/`, reads `data/_raw/`, imports `slm_core` from the parent |
 | `data_construction/build_corpus.py` | rebuilds the corpus from `data/_raw/` — the **single house-style verbalizer** + LGMT + budget |
 | `data_construction/stepb_verbalize.py` | optional **frontier-verbalizer** upgrade (Opus/Haiku routing + FOL solver), resumable |
-| `data_construction/fol_solver.py` | FOLIO/LogicNLI symbolic entailment solver (z3) — unsat-core + Uncertain countermodel witness |
-| `data_construction/fol.py` · `logicnli_fol.py` · `folio_concl_fol.py` | FOL parser · LogicNLI NL→FOL · FOLIO-train conclusion NL→FOL (cached) |
+| `data_construction/fol_solver.py` | z3 classical entailment solver (unsat-core + Uncertain countermodel witness) — used for **both** FOLIO and (post-pruning) LogicNLI |
+| `data_construction/logicnli_logic.py` | LogicNLI **structured** `_logic.json` → FOL (exact, from the original release) |
+| `data_construction/logicnli_prune.py` | **LogicNLI per-conclusion pruning** to a classically-consistent, z3-verified, gold-preserving premise subset (raw blocks are UNSAT by construction); also exports `data/lgmt_sources.json` |
+| `data_construction/fol_forward.py` | bounded forward-chaining reasoner — now only **seeds** the prune (relevant premises) |
+| `data_construction/fol.py` · `logicnli_fol.py` · `folio_concl_fol.py` | FOL parser · LogicNLI NL→FOL (legacy fallback) · FOLIO-train conclusion NL→FOL (cached) |
 | `smoke.py` | end-to-end loop check on the real data (CPU, tiny model, few steps) |
 | `.env` / `.env.example` | paste `ANTHROPIC_API_KEY=` here for the judge fallback + Step B (gitignored) |
 | `data/sft_train.jsonl` | **pre-built** training rows `{prompt, completion, gold, …}` (~7.5k) |
@@ -66,15 +69,19 @@ leakage). Format mix ≈ 55% FRQ / 45% MCQ.
 
 ### Trace fidelity — two tiers
 1. **Deterministic (shipped default, `data/sft_train.jsonl`).** One verbalizer:
-   ProverQA restyles its real Prover9 chain; FOLIO/LogicNLI use grounded entailment/neutral
-   templates; MCQ cites the credited option. Every completion is gold-correct (0/7458 fail
-   the grader). Cheap, instant, teaches the **primary** target (format + commitment + neutral).
+   ProverQA restyles its real Prover9 chain; **FOLIO** gets z3 solver paths (entailing premises /
+   countermodel witness) and **LogicNLI** gets forward-chained derivations (§ solver paths), with a
+   grounded template only where the solver declines; MCQ cites the credited option. Every completion is
+   gold-correct (0/7473 fail the grader). Cheap, instant, teaches the **primary** target
+   (format + commitment + neutral).
 2. **Step B frontier verbalizer (optional upgrade, `stepb_verbalize.py`).** Replaces the
    templates with *real, faithfully-verified* reasoning, routed by cost:
    - **ProverQA** → Haiku **rewords** the shipped chain.
-   - **FOLIO-val** → `fol_solver.py` (z3) proves the entailment; if the solver agrees with
+   - **FOLIO** → `fol_solver.py` (z3) proves the entailment; if the solver agrees with
      gold, Haiku **rewords the verified verdict** (with a countermodel witness for neutral).
-   - **Everything else (no shipped FOL)** → **Opus generates**: blind-solve; on a miss,
+   - **LogicNLI** → `fol_forward.py` forward-chains the structured logic; Haiku **rewords the
+     verified chain** (96% of items have one).
+   - **Everything else (MCQ, no formal FOL)** → **Opus generates**: blind-solve; on a miss,
      answer-conditioned backfill gated by a **blind re-read** (a 2nd call sees only the
      reasoning and must re-commit to gold — catches rationalization).
    Every trace is gold-verified before use; failures keep the deterministic completion.
@@ -341,3 +348,10 @@ Green = the wiring connects on the *real* data. Does not prove learning.
 `data/_raw/` holds the source datasets (ReClor zip, LogiQA/LogicNLI/ProverQA, FOLIO train+val,
 adversarial ARCT). `data_construction/build_corpus.py` reads them; re-download any missing one per
 [`../../critical-reasoning-eval/SOURCES.md`](../../critical-reasoning-eval/SOURCES.md).
+
+LogicNLI solver paths additionally need the **original structured release** at
+`data/_raw/logicnli_sim/LogicNLI_sim/` (`dev_logic.json` + `dev_language.json`): download
+`https://raw.githubusercontent.com/omnilabNLP/LogicNLI/main/dataset/LogicNLI_sim.zip` and unzip it
+there. It joins to the logi_glue items by index (row `i` ⇒ block `i//20`, statement `i%20`). If the
+zip is absent, LogicNLI degrades gracefully to templates. The z3-based FOLIO solver needs
+`pip install z3-solver`.

@@ -1,43 +1,45 @@
 {
-  "n_train_rows": 7473,
-  "n_eval_items": 1527,
+  "n_train_rows": 7414,
+  "n_eval_items": 1516,
   "n_lgmt": 1200,
   "eval_frac": 0.2,
   "seed": 0,
   "train_by_family": {
     "lsat_lr": 1218,
-    "logiqa": 1130,
+    "logiqa": 1122,
     "arct": 1025,
     "folio": 1292,
-    "logicnli": 1615,
-    "proverqa": 1193
+    "logicnli": 1556,
+    "proverqa": 1201
   },
   "train_by_mode": {
-    "mcq": 3373,
-    "frq": 4100
+    "mcq": 3365,
+    "frq": 4049
   },
   "train_by_format_type": {
     "MCQ-lsat_lr": 1218,
-    "MCQ-logiqa": 1130,
+    "MCQ-logiqa": 1122,
     "MCQ-arct": 1025,
-    "FRQ-entailment": 4100
+    "FRQ-entailment": 4049
   },
   "proverqa_by_difficulty": {
-    "medium": 600,
-    "hard": 593
+    "medium": 578,
+    "hard": 623
   },
   "eval_by_family": {
     "lsat_lr": 282,
-    "logiqa": 270,
+    "logiqa": 278,
     "arct": 275,
     "folio": 208,
-    "logicnli": 285,
-    "proverqa": 207
+    "logicnli": 274,
+    "proverqa": 199
   },
-  "eval_neutral_gold": 243,
+  "eval_neutral_gold": 239,
   "trace_source": {
-    "grounded_template": 5752,
-    "solver_path": 976,
-    "prover_chain": 745
+    "blind": 3256,
+    "grounded_template": 273,
+    "solver_path": 3088,
+    "backfill": 34,
+    "prover_chain": 763
   }
 }

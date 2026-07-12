@@ -46,9 +46,21 @@ try:
 except Exception:
     fol_solver = None
 try:
-    import logicnli_fol          # separate LogicNLI NL->FOL parser (best-effort)
+    import logicnli_fol          # separate LogicNLI NL->FOL parser (best-effort fallback)
 except Exception:
     logicnli_fol = None
+try:
+    import logicnli_logic         # structured LogicNLI _logic.json -> FOL (primary, exact)
+except Exception:
+    logicnli_logic = None
+try:
+    import fol_forward            # bounded forward-chaining reasoner (seeds the prune)
+except Exception:
+    fol_forward = None
+try:
+    import logicnli_prune         # per-conclusion classically-consistent premise pruning
+except Exception:
+    logicnli_prune = None
 try:
     import folio_concl_fol       # FOLIO-train conclusion NL->FOL (cached; gateway-gated)
 except Exception:
@@ -74,6 +86,34 @@ RECLOR_PW = b"for_non-commercial_research_purpose_only"
 
 def norm_ws(s: str) -> str:
     return re.sub(r"\s+", " ", (s or "").replace("−", "-")).strip()
+
+
+def _norm_key(s: str) -> str:
+    """Normalized passage key for cross-dataset dedup (whitespace + case folded)."""
+    return norm_ws(s).lower()
+
+
+_RECLOR_KEYS = None
+
+
+def _reclor_keys() -> set:
+    """Normalized ReClor passages (train+val+test). LogiQA and ReClor share LSAT source
+    items, so any LogiQA passage duplicated here is dropped in parse_logiqa (ReClor owns
+    it) — a shared passage then never straddles the train/eval split. Cached."""
+    global _RECLOR_KEYS
+    if _RECLOR_KEYS is None:
+        keys = set()
+        try:
+            zf = zipfile.ZipFile(RAW / "reclor_data.zip")
+            for sp in ("train.json", "val.json", "test.json"):
+                for ex in json.loads(zf.read(sp, pwd=RECLOR_PW)):
+                    c = ex.get("context")
+                    if c:
+                        keys.add(_norm_key(c))
+        except Exception:
+            pass
+        _RECLOR_KEYS = keys
+    return _RECLOR_KEYS
 
 
 def _rank(iid: str, seed: int = 0) -> float:
@@ -144,6 +184,10 @@ def parse_logiqa() -> list[dict]:
         text, q = norm_ws(d.get("text", "")), norm_ws(d.get("question", ""))
         if not text or not q or not isinstance(ans, int) or len(opts) != 4 or ans >= 4:
             continue
+        # cross-family dedup: drop LogiQA passages duplicated in ReClor (both draw from
+        # LSAT). ReClor keeps them; the appended repl-* replacements (not in ReClor) survive.
+        if _norm_key(text) in _reclor_keys():
+            continue
         out.append({
             "id": f"logiqa-{d.get('id', len(out))}",
             # multiple questions share one passage across distinct ids -> group by the
@@ -182,10 +226,10 @@ def parse_arct() -> list[dict]:
             # variant) share the Topic/Reason/Claim stimulus, so group by claim id to keep
             # them on one split side (else the same argument leaks train<->eval).
             cm = re.match(r"(\d+_\d+)", str(rid))
-            claim = cm.group(1) if cm else str(rid)
+            claim_id = cm.group(1) if cm else str(rid)     # group key only — NOT the claim text
             out.append({
                 "id": f"arct-{split.split('-')[0]}-{rid}-{'n' if neg else 'o'}",
-                "group_id": f"arct-{claim}",
+                "group_id": f"arct-{claim_id}",
                 "family": "arct", "task_type": "warrant", "difficulty": "hard",
                 "mode": "mcq", "stimulus": f"Topic: {title}\nReason: {reason}\nClaim: {claim}",
                 "question": "Which warrant makes the reason support the claim?",
@@ -270,12 +314,33 @@ def parse_logicnli() -> list[dict]:
         if not premises or not statement:
             continue
         label = MAP[at]
-        pf = cf = None
-        if logicnli_fol is not None:
-            try:
-                pf, cf = logicnli_fol.context_to_fol(d.get("context", ""))
-            except Exception:
-                pf = cf = None
+        # FOL from the ORIGINAL structured logic form (exact), joined by the verified index
+        # (logi_glue row i == block i//20, statement i%20). Then PER-CONCLUSION PRUNING to a
+        # classically-consistent, z3-verified, gold-preserving premise subset (logicnli_prune):
+        # LogicNLI blocks are inconsistent by construction, so the whole block is unusable for a
+        # classical solver / LGMT. We keep the largest premise subset that stays satisfiable and
+        # still yields the gold verdict, and REBUILD the stimulus from just those premises. A
+        # statement that can't be made consistent-and-gold-matching is DROPPED (never inconsistent).
+        pf = cf = nl_prem = None
+        b, sidx = i // 20, i % 20
+        structured = logicnli_logic is not None and logicnli_logic.available("dev")
+        if structured and logicnli_prune is not None:
+            pr = logicnli_prune.prune_for(b, sidx, label)
+            if pr is None:
+                continue                            # cannot make classically consistent -> drop
+            _kept, pf, cf, nl_prem = pr
+            premises = " ".join(s for s in nl_prem if s)   # stimulus = kept premises only
+        else:                                       # degrade: structured source / pruner absent
+            if structured:
+                try:
+                    pf, cf, nl_prem = logicnli_logic.fol_for(b, sidx)
+                except Exception:
+                    pf = cf = nl_prem = None
+            if pf is None and logicnli_fol is not None:
+                try:
+                    pf, cf = logicnli_fol.context_to_fol(d.get("context", ""))
+                except Exception:
+                    pf = cf = None
         out.append({
             # one facts+rules block (id_) carries ~15 distinct statements; keep the id
             # per-context here (the global uniqueness pass in main() disambiguates the
@@ -285,7 +350,7 @@ def parse_logicnli() -> list[dict]:
             "family": "logicnli",
             "task_type": "entailment", "difficulty": "hard", "mode": "frq",
             "stimulus": premises, "_premises": [premises], "_statement": statement,
-            "_premises_fol": pf, "_conclusion_fol": cf,
+            "_premises_fol": pf, "_conclusion_fol": cf, "_nl_premises_fol": nl_prem,
             "question": (f"Based ONLY on the context above, is the statement "
                          f"\"{statement}\" True, False, or Unknown?"),
             "choices": ["True", "False", "Unknown"],
@@ -313,11 +378,20 @@ def parse_proverqa() -> list[dict]:
                 "Based on the above information, is the following statement true, false, or uncertain? ", "")
             if label not in ("True", "False", "Uncertain") or not ctx:
                 continue
+            # ProverQA ships FOL for every item: nl2fol (NL premise -> FOL) + conclusion_fol.
+            # Carry it so z3 can cover the NEUTRAL (Uncertain) class, which has no Prover9 chain
+            # (the chain only exists for True/False). True/False keep the shipped chain.
+            n2f = d.get("nl2fol") or {}
+            pf = [v for v in n2f.values() if str(v).strip()]
+            nlp = [k for k, v in n2f.items() if str(v).strip()]
             out.append({
                 "id": f"proverqa-{diff}-{d.get('id', i)}", "family": "proverqa",
+                "group_id": f"proverqa-ctx-{hashlib.sha1(ctx.encode()).hexdigest()[:12]}",
                 "task_type": "entailment", "difficulty": diff, "mode": "frq",
                 "stimulus": ctx, "_premises": [s.strip() for s in ctx.split(".") if s.strip()],
                 "_statement": statement, "_reasoning": d.get("reasoning", ""),
+                "_premises_fol": pf, "_conclusion_fol": d.get("conclusion_fol") or None,
+                "_nl_premises_fol": nlp,
                 "question": ("Based only on the premises, is the statement "
                              f"\"{statement}\" True, False, or Uncertain?"),
                 "choices": ["True", "False", "Uncertain"],
@@ -363,20 +437,26 @@ def _proverqa_chain(raw: str) -> str:
 
 
 def attach_solver_path(it: dict) -> None:
-    """For a FOLIO/LogicNLI item carrying FOL, run the working-path solver and, ONLY if
-    it decides AND agrees with the gold label, stash a real derivation on `_solver_path`
-    (True/False: the entailing premises; Uncertain: a countermodel witness). Solver-
-    verified, so a wrong parse/label is silently dropped -> template fallback (never
-    poisons data). This is how FOLIO/LogicNLI get ProverQA-style real traces."""
+    """For a FOLIO/LogicNLI item carrying FOL, run the appropriate working-path solver and,
+    ONLY if it decides AND agrees with the gold label, stash a real derivation on
+    `_solver_path`. Solver-verified, so a wrong parse/label is silently dropped -> template
+    fallback (never poisons data). This is how FOLIO/LogicNLI get ProverQA-style real traces.
+
+    Both FOLIO and (post-pruning) LogicNLI carry a classically CONSISTENT FOL theory, so both
+    use z3 global entailment (`fol_solver.classify_path`): True/False cite the entailing
+    premises, Uncertain/Unknown gets a countermodel witness. LogicNLI is consistent here only
+    because `parse_logicnli` pruned each block to a satisfiable, gold-preserving premise subset
+    (raw LogicNLI blocks are inconsistent and z3 would refuse them)."""
     if fol_solver is None:
         return
     pf, cf = it.get("_premises_fol"), it.get("_conclusion_fol")
     if not pf or not cf:
         return
     gold = S.canon_label(it["reference_answer"]) or it["reference_answer"]
+    stmt = it.get("_statement", "the statement")
+    nlp = it.get("_nl_premises_fol") or it.get("_premises")   # aligned NL for citation
     try:
-        lab, path, _ = fol_solver.classify_path(
-            pf, cf, it.get("_premises"), it.get("_statement", "the statement"))
+        lab, path, _ = fol_solver.classify_path(pf, cf, nlp, stmt)
     except Exception:
         return
     if lab and path and S.labels_equiv(lab, gold):
@@ -559,8 +639,15 @@ def main() -> int:
             if (it["family"] == "folio" and it.get("_premises_fol")
                     and not it.get("_conclusion_fol") and folio_concl_fol is not None):
                 it["_conclusion_fol"] = folio_concl_fol.translate(
-                    it["id"], it.get("_statement", ""), it["_premises_fol"])
+                    it["id"], it.get("_statement", ""), it["_premises_fol"],
+                    gold=S.canon_label(it["reference_answer"]) or it["reference_answer"])
             if it["family"] in ("folio", "logicnli"):
+                attach_solver_path(it)
+            # ProverQA: z3 ONLY for the neutral (Uncertain) class — it has no Prover9 chain.
+            # True/False keep the shipped chain (prover_chain), which is a richer derivation.
+            elif (it["family"] == "proverqa" and it.get("_premises_fol")
+                  and it.get("_conclusion_fol")
+                  and (S.canon_label(it["reference_answer"]) in S.NEUTRAL)):
                 attach_solver_path(it)
         if folio_concl_fol is not None:
             try:
@@ -568,7 +655,7 @@ def main() -> int:
             except Exception:
                 pass
         sp = Counter((it["family"], "solver" if it.get("_solver_path") else "template")
-                     for it in items if it["family"] in ("folio", "logicnli"))
+                     for it in items if it["family"] in ("folio", "logicnli", "proverqa"))
         print(f"  solver-path coverage: {dict(sp)}")
 
     # hashed per-id split -> held-out slice of EVERY family
@@ -599,12 +686,61 @@ def main() -> int:
 
     train_rows = [to_row(it) for it in train] + lgmt_rows
 
+    # Step-B overlay: replace a row's deterministic completion with a VERIFIED frontier trace
+    # (Opus blind / answer-conditioned + blind re-read) from data/folio_stepb_review.jsonl, so
+    # those traces survive rebuilds. Only 'blind'/'backfill' rows are applied, and only onto the
+    # matching id — the committing final sentence still yields the gold, so 0-grade-mismatch holds.
+    overlay = {}
+    for overlay_path in sorted(OUT.glob("*_stepb_review.jsonl")):
+        for line in overlay_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            o = json.loads(line)
+            if o.get("trace_source") in ("blind", "backfill") and o.get("completion"):
+                overlay[o["id"]] = o
+    if overlay:
+        applied = 0
+        for r in train_rows:
+            o = overlay.get(r["id"])
+            if o and r["gold"] == o.get("gold"):
+                r["completion"] = o["completion"]
+                r["trace_source"] = o["trace_source"]
+                applied += 1
+        print(f"  step-B overlay: applied {applied} frontier traces "
+              f"from {len(list(OUT.glob('*_stepb_review.jsonl')))} review file(s)")
+
     OUT.mkdir(parents=True, exist_ok=True)
     with (OUT / "sft_train.jsonl").open("w", encoding="utf-8") as fh:
         for r in train_rows:
             fh.write(json.dumps(r, ensure_ascii=False) + "\n")
     (OUT / "eval_items.json").write_text(
         json.dumps([eval_view(it) for it in ev], ensure_ascii=False, indent=2), encoding="utf-8")
+
+    # LGMT source export: the classically-CONSISTENT FOL entailment cases (LogicNLI is
+    # consistent only after the per-conclusion pruning above; FOLIO ships consistent FOL).
+    # Format matches critical-reasoning-eval/lgmt_full.py's source items so LGMT can run
+    # metamorphic testing on them (it verifies satisfiability again with z3 before use).
+    lgmt_src = []
+    for it in items:
+        if it["family"] not in ("logicnli", "folio"):
+            continue
+        if not it.get("_solver_path"):
+            continue                                  # only z3-VERIFIED (SAT + verdict==gold) cases
+        pf = it.get("_premises_fol") or []
+        cf = it.get("_conclusion_fol")
+        nlp = it.get("_nl_premises_fol") if it["family"] == "logicnli" else it.get("_premises")
+        if not pf or not cf or not nlp or len(nlp) != len(pf):
+            continue                                  # need aligned NL/FOL premises
+        g = it["reference_answer"]
+        g = "Unknown" if g in ("Uncertain", "Unknown") else g   # LGMT's 3-valued scheme
+        lgmt_src.append({
+            "id": it["id"], "family": it["family"],
+            "premises": [str(x) for x in nlp], "premises_fol": [str(x) for x in pf],
+            "conclusion": it.get("_statement", ""), "conclusion_fol": str(cf),
+            "gold": g,
+        })
+    (OUT / "lgmt_sources.json").write_text(
+        json.dumps(lgmt_src, ensure_ascii=False, indent=2), encoding="utf-8")
 
     # meta / provenance
     fmt = Counter()

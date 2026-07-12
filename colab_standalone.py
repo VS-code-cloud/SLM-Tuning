@@ -552,13 +552,20 @@ def main() -> int:
         # GC handled below with our sm_120-safe kwargs, not by prepare_* (reentrant)
         model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=False)
     model.config.use_cache = False
-    if use_cuda:
-        # preserve_rng_state=False: skips fork_rng/set_rng_state during recompute,
-        # which throws cudaErrorUnknown on this RTX 5050 (sm_120) build. Safe because
-        # lora_dropout=0 below -> recompute is deterministic anyway.
+    if use_cuda and args.load_4bit:
+        # Gradient checkpointing is only needed to fit the memory-constrained 4-bit path
+        # (4B QLoRA on an 8 GB sm_120 laptop). preserve_rng_state=False skips
+        # fork_rng/set_rng_state during recompute, which throws cudaErrorUnknown on that
+        # sm_120 build (safe: lora_dropout=0 -> recompute is deterministic).
         model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={
             "use_reentrant": False, "preserve_rng_state": False})
         model.enable_input_require_grads()   # required for GC + LoRA
+    elif use_cuda:
+        # bf16 (non-quantized) fits comfortably on A100-class GPUs at these <=1536-token
+        # batches, so skip gradient checkpointing entirely: no recompute -> no non-reentrant
+        # tensor-count CheckpointError, and it's faster. (Qwen's checkpoint wrapper ignores
+        # use_reentrant, so toggling that does not help — the fix is to not checkpoint.)
+        model.gradient_checkpointing_disable()
     if args.resume and (Path(args.resume) / "adapter_config.json").exists():
         from peft import PeftModel
         # load the prior adapter onto the (already kbit-prepared, GC-enabled) base and

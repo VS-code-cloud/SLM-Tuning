@@ -33,6 +33,12 @@ suite.sh
 # ---- transient cache write artifacts ----
 *.tmp
 *.bak
+# resume append-logs (redundant with the final *.jsonl outputs)
+*.cache.jsonl
+# pre-MCQ corpus safety backup
+*.pre_mcq
+# Windows Alternate Data Stream upload cruft
+*Zone.Identifier
 
 # ---- Python / editor / OS junk ----
 __pycache__/
