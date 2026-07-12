@@ -192,16 +192,20 @@ Neutral recall (entailment-only) in parens; MVR/HDR from the n=20 LGMT probe (to
 |---|---|---|---|---|---|---|---|---|
 | base (untuned) | 75.0 | 61.7 (50.0) | 48.3 (26.7) | 65.0 | 81.7 | 50.0 (63.3) | 63.6 | 20/20 |
 | **shortened** ← best tested | 93.3 | 73.3 (66.7) | 88.3 (96.7) | 78.3 | 86.7 | 91.7 (100) | **85.3** | 20/20 |
-| v2 (4 phases) | 90.0 | 71.7 (**86.7**) | 83.3 (86.7) | 80.0 | 81.7 | 90.0 (100) | 82.8 | — (not captured) |
+| v2 (4 phases) | 90.0 | 71.7 (**86.7**) | 83.3 (86.7) | 80.0 | 81.7 | 90.0 (100) | 82.8 | **0/0** |
 | v3 (lsat_lr-elim + P4) | 88.3 | 68.3 (66.7) | 85.0 (96.7) | 68.3 | 85.0 | 95.0 (93.3) | 81.7 | 5/5 |
 | v1-long (non-shortened) | 91.7 | 65.0 (66.7) | 85.0 (96.7) | 68.3 | **90.0** | 88.3 (96.7) | 81.4 | 5/5 |
 | v4 (P2 + P4) | *untested* | | | | | | *TBD* | *TBD* |
 | Sonnet 4.6 (frontier ref) | 88.3 | 75.0 (76.7) | 63.3 (30.0) | 81.7 | 96.6 | 69.5 (73.3) | 79.1 | 15/10 |
 | **Opus 4.8** (frontier ref) | 95.0 | 76.7 (76.7) | 95.0 (93.3) | 83.3 | 100 | 81.4 (93.3) | **88.5** | 10/10 |
 
-Reads: **shortened (85.3) leads the tested corpora and beats Sonnet 4.6 (79.1) outright** — all four SLM
+Reads: **shortened (85.3) leads on accuracy and beats Sonnet 4.6 (79.1) outright** — all four SLM
 variants beat Sonnet. So the distilled 4B sits **between Sonnet and Opus**, within 3.2 of Opus (88.5).
 The SLM **beats both frontier models on proverqa** (91.7 vs Opus 81.4 / Sonnet 69.5) and leads neutral
-recall (Sonnet collapses on logicnli-neutral, 30.0). The residual gap to Opus is lsat_lr / logicnli /
-logiqa (4B reasoning capacity). v4 is the untested candidate meant to add v2's folio-neutral + P4
-robustness on top of shortened's accuracy.
+recall (Sonnet collapses on logicnli-neutral, 30.0). The residual accuracy gap to Opus is lsat_lr /
+logicnli / logiqa (4B reasoning capacity).
+On **robustness**, the picture inverts: **v2 has the best MVR (0/20)** while **shortened is the worst
+(20/20 — tuning didn't reduce it from base)**; every other tuned run lowered it (v1-long 5, v3 5). So
+shortened trades robustness for accuracy. **Caveat: the LGMT probe is n=20 (±1 item = 5%), too coarse to
+rank on — needs n≥40.** v4 (untested) keeps P2 (folio-neutral +20) and P4 (the MVR lever), aiming to
+carry shortened's accuracy *and* v2's robustness together.
