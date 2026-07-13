@@ -102,9 +102,10 @@ def main() -> int:
                     help="fixed judge model for the FRQ probe (kept constant across all "
                          "evaluated models so scores are comparable and no model self-judges)")
     ap.add_argument("--out", default=str(HERE / "runs" / "eval_opus48"))
+    ap.add_argument("--eval-file", default=None, help="eval items file (default data/eval_items.json)")
     args = ap.parse_args()
 
-    eval_items = S.load_eval_items()
+    eval_items = S.load_eval_items(args.eval_file)
     picked = pick(eval_items, args.eval_per_family, args.neutral_frac)
     graded = []
     for it in picked:

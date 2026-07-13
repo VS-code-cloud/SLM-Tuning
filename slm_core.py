@@ -1,4 +1,4 @@
-"""Self-contained core for the Colab SFT of Qwen3.5-0.8B.
+"""Self-contained core for the Colab SFT of a small Qwen (4B flagship; smaller sizes supported).
 
 Bundles everything the notebook needs with NO dependency on the parent repo or on
 ``cursor-agent``: the prompt contract (mirrors ``../common.py`` ->

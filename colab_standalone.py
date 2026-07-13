@@ -10,20 +10,18 @@
 #         then set DATA_DIR to the folder that holds the two files; OR
 #     (b) leave DATA_DIR="." and you'll be prompted to upload the two files.
 # ==========================================================================
-from __future__ import annotations
-
 # ------------------------------ CONFIG ------------------------------
 # Default = Qwen3.5-2B in bf16: fast (tensor cores, no nf4 dequant), good, fits any
 # Colab GPU. FLAGSHIP (best accuracy: ~82% on the held-out slice, +23 over base) is
 # Qwen3.5-4B via 4-bit QLoRA — uncomment the flagship block. (0.8B was the OLD default.)
-MODEL_ID        = "Qwen/Qwen3.5-2B"
-LOAD_4BIT       = False     # bf16. Set True for nf4 QLoRA (needed to fit 4B).
-BATCH_SIZE      = 8         # max rows/batch (token budget also caps it)
-MAX_TOKENS      = 3072      # token budget per batch (rows x longest row)
-GRAD_ACCUM      = 4
+# MODEL_ID        = "Qwen/Qwen3.5-2B"
+# LOAD_4BIT       = False     # bf16. Set True for nf4 QLoRA (needed to fit 4B).
+# BATCH_SIZE      = 8         # max rows/batch (token budget also caps it)
+# MAX_TOKENS      = 3072      # token budget per batch (rows x longest row)
+# GRAD_ACCUM      = 4
 # --- FLAGSHIP 4B (best results) — uncomment on a 16 GB+ Colab GPU (T4/L4/A100): ---
-# MODEL_ID = "Qwen/Qwen3.5-4B"; LOAD_4BIT = True
-# BATCH_SIZE = 4; MAX_TOKENS = 1536; GRAD_ACCUM = 2
+MODEL_ID = "Qwen/Qwen3.5-4B"; LOAD_4BIT = False
+BATCH_SIZE = 4; MAX_TOKENS = 1536; GRAD_ACCUM = 2
 # (8 GB sm_120 laptop only: BATCH_SIZE=2, MAX_TOKENS=1024, and do NOT set
 #  PYTORCH_CUDA_ALLOC_CONF=expandable_segments. Colab T4/A100 have no such limit.)
 EPOCHS          = 1
@@ -33,19 +31,20 @@ LORA_ALPHA      = 32
 MAX_LEN         = 1024
 MAX_STEPS       = 0         # 0 = full EPOCHS
 SAVE_EVERY      = 100       # checkpoint adapter every N updates (0 = only at end)
-EVAL_PER_FAMILY = 40
+EVAL_PER_FAMILY = 60
 MAX_NEW_TOKENS  = 512
 EVAL_BATCH      = 8         # batched eval generation (~3x faster; lower if OOM)
 NEUTRAL_FRAC    = 0.25      # over-sample neutral/non-entailment to ~25% of the eval
 LGMT_EVAL       = 20        # LGMT consistency probe items/condition (0 = off)
+LGMT300_FILE    = "lgmt300.json"   # full-20-MR LGMT set (tuned); "" = off
 FRQ_EVAL        = 0         # >0 => open-ended satellite probe, N items/family (needs a judge)
 JUDGE_MODEL     = ""        # e.g. "claude-haiku-4-5" / "claude-opus-4-8" for parse-fallback + FRQ judge
 # --- judge/FRQ grading credentials (blank = no judging) ---
 ANTHROPIC_BASE_URL   = ""   # gateway URL (blank = api.anthropic.com)
 ANTHROPIC_AUTH_TOKEN = ""   # Bearer token for a gateway  (OR use ANTHROPIC_API_KEY)
 ANTHROPIC_API_KEY    = ""   # x-api-key (if not using a gateway)
-DATA_DIR        = "."       # folder holding sft_train.jsonl + eval_items.json
-OUT_DIR         = "runs/colab"
+DATA_DIR        = "/content/drive/MyDrive/SLM/data"       # folder holding sft_train.jsonl + eval_items.json
+OUT_DIR         = "/content/drive/MyDrive/SLM/runs/colab"
 TRAIN_FILE      = ""        # "" => DATA_DIR/sft_train.jsonl (e.g. sft_train_stepb.jsonl)
 RESUME          = ""        # dir of a prior checkpoint adapter to resume from
 SKIP_UPDATES    = 0         # with RESUME: updates already done
@@ -72,7 +71,7 @@ _pip()
 from pathlib import Path as _Path
 def _ensure_data():
     """Make sure sft_train.jsonl + eval_items.json exist under DATA_DIR (upload if not)."""
-    need = ["sft_train.jsonl", "eval_items.json"]
+    need = ["sft_train_v7.jsonl", "eval_items_clean.json", "lgmt300.json"]
     missing = [f for f in need if not (_Path(DATA_DIR) / f).exists()]
     if not missing:
         return
@@ -136,7 +135,7 @@ NEUTRAL_ALIASES = [
 # --------------------------------------------------------------------------
 def load_sft_rows(path: str | Path | None = None) -> list[dict]:
     """Training rows: {id, family, mode, prompt, completion, gold, ...}."""
-    p = Path(path or DATA / "sft_train.jsonl")
+    p = Path(path or DATA / "sft_train_v7.jsonl")
     rows = []
     for line in p.read_text(encoding="utf-8").splitlines():
         line = line.strip()
@@ -149,7 +148,7 @@ def load_sft_rows(path: str | Path | None = None) -> list[dict]:
 
 def load_eval_items(path: str | Path | None = None) -> list[dict]:
     """Held-out eval items (full fields) across every family."""
-    p = Path(path or DATA / "eval_items.json")
+    p = Path(path or DATA / "eval_items_clean.json")
     return json.loads(p.read_text(encoding="utf-8"))
 
 
@@ -492,6 +491,7 @@ def main() -> int:
         max_new_tokens=MAX_NEW_TOKENS, eval_batch=EVAL_BATCH, lgmt_eval=LGMT_EVAL,
         neutral_frac=NEUTRAL_FRAC, frq_eval=FRQ_EVAL,
         judge_model=JUDGE_MODEL, out=OUT_DIR, load_4bit=LOAD_4BIT,
+        lgmt300_file=(LGMT300_FILE or ""),
         resume=RESUME, skip_updates=SKIP_UPDATES, eval_only=EVAL_ONLY, cpu=CPU)
 
     import torch
@@ -552,20 +552,10 @@ def main() -> int:
         # GC handled below with our sm_120-safe kwargs, not by prepare_* (reentrant)
         model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=False)
     model.config.use_cache = False
-    if use_cuda and args.load_4bit:
-        # Gradient checkpointing is only needed to fit the memory-constrained 4-bit path
-        # (4B QLoRA on an 8 GB sm_120 laptop). preserve_rng_state=False skips
-        # fork_rng/set_rng_state during recompute, which throws cudaErrorUnknown on that
-        # sm_120 build (safe: lora_dropout=0 -> recompute is deterministic).
+    if use_cuda and args.load_4bit:            # GC only needed for the memory-constrained 4-bit path
         model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={
             "use_reentrant": False, "preserve_rng_state": False})
-        model.enable_input_require_grads()   # required for GC + LoRA
-    elif use_cuda:
-        # bf16 (non-quantized) fits comfortably on A100-class GPUs at these <=1536-token
-        # batches, so skip gradient checkpointing entirely: no recompute -> no non-reentrant
-        # tensor-count CheckpointError, and it's faster. (Qwen's checkpoint wrapper ignores
-        # use_reentrant, so toggling that does not help — the fix is to not checkpoint.)
-        model.gradient_checkpointing_disable()
+        model.enable_input_require_grads()
     if args.resume and (Path(args.resume) / "adapter_config.json").exists():
         from peft import PeftModel
         # load the prior adapter onto the (already kbit-prepared, GC-enabled) base and
@@ -868,6 +858,53 @@ def main() -> int:
             lgmt["base"] = lgmt_consistency("base ")
         lgmt["tuned"] = lgmt_consistency("tuned")
 
+    # ---- full-20-MR LGMT probe (tuned): the fixed lgmt300.json set, same MVR/HDR as the
+    # gateway lgmt300_eval.py, so the SLM row slots into data-synthesis.md's LGMT-300 table. ----
+    def lgmt300_consistency(path):
+        d3 = json.loads(Path(path).read_text(encoding="utf-8"))
+        src3, cases3 = d3["sources"], d3["cases"]
+        def _it(prem, concl, gold):
+            stim = "Premises:\n" + "\n".join(f"- {x}" for x in prem) + f"\n\nConclusion: {concl}"
+            return {"stimulus": stim, "family": "folio", "mode": "frq", "reference_answer": gold,
+                    "question": ("Based only on the premises, is the conclusion True, False, or "
+                                 "Unknown (it does not deductively follow either way)?")}
+        sids = list(src3)
+        s_out = gen_chunked([_it(src3[i]["premises"], src3[i]["conclusion"], src3[i]["gold"]) for i in sids],
+                            ["frq"] * len(sids))
+        c_out = gen_chunked([_it(m["premises"], m["conclusion"], m["gold"]) for m in cases3],
+                            ["frq"] * len(cases3))
+        slab = {sids[i]: S.parse_label(s_out[i], neutral_hint="Unknown") for i in range(len(sids))}
+        per = {}; V = H = N = accs = accn = 0
+        for m, txt in zip(cases3, c_out):
+            yf = S.parse_label(txt, neutral_hint="Unknown"); ys = slab.get(m["item_id"]); g = m["gold"]
+            if ys is None or yf is None:
+                continue
+            N += 1; viol = not S.labels_equiv(ys, yf); V += int(viol)
+            if viol and S.labels_equiv(ys, S.canon_label(g) or g):
+                H += 1
+            cat = m.get("category", "?"); per.setdefault(cat, [0, 0])
+            per[cat][0] += 1; per[cat][1] += int(viol)
+        for i in sids:
+            if slab[i] is not None:
+                accn += 1; accs += int(S.labels_equiv(slab[i], S.canon_label(src3[i]["gold"]) or src3[i]["gold"]))
+        return {"n": N, "mvr": pct(V, N), "hdr": pct(H, N), "acc_static": pct(accs, accn),
+                "by_category": {c: {"n": v[0], "mvr": pct(v[1], v[0])} for c, v in sorted(per.items())}}
+
+    lgmt300 = {}
+    if args.lgmt300_file:
+        p300 = Path(args.lgmt300_file)
+        if not p300.exists():
+            p300 = DATA / args.lgmt300_file
+        if p300.exists():
+            print(f"\n[run_sft] full-20-MR LGMT probe (tuned) <- {p300.name}", flush=True)
+            lgmt300 = lgmt300_consistency(p300)
+            print(f"[tuned] LGMT-300 (n={lgmt300['n']}): Acc_static {lgmt300['acc_static']}% | "
+                  f"MVR {lgmt300['mvr']}% | HDR {lgmt300['hdr']}%", flush=True)
+            for c, v in lgmt300["by_category"].items():
+                print(f"    {c}: n={v['n']} MVR {v['mvr']}%", flush=True)
+        else:
+            print(f"[run_sft] LGMT300_FILE '{args.lgmt300_file}' not found — skipping", flush=True)
+
     # ---- optional satellite FRQ probe (EVAL-ONLY; training stays MCQ). Pose the
     # OPEN-ENDED question (state the flaw / warrant / assumption) instead of MCQ and
     # judge semantic correctness with the gateway. This measures the generation /
@@ -971,7 +1008,7 @@ def main() -> int:
                "tuned": {"parse": pct(tuned_t['parse'], tuned_t['n']),
                          "acc": pct(tuned_t['correct'], tuned_t['n']),
                          "neutral": pct(tuned_t['neu_c'], tuned_t['neu_n'])},
-               "lgmt": lgmt, "frq": frq}
+               "lgmt": lgmt, "lgmt300": lgmt300, "frq": frq}
     Path(args.out).mkdir(parents=True, exist_ok=True)   # eval-only skips the adapter-save mkdir
     (Path(args.out) / "metrics.json").write_text(json.dumps(metrics, indent=2))
     print(f"\n[run_sft] metrics -> {Path(args.out)/'metrics.json'}")

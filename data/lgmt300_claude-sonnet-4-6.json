@@ -1,0 +1,25 @@
+{
+  "model": "claude-sonnet-4-6",
+  "n": 288,
+  "MVR": 9.7,
+  "HDR": 2.8,
+  "Acc_static": 76.9,
+  "by_category": {
+    "MR-C": {
+      "n": 62,
+      "MVR": 9.7
+    },
+    "MR-E": {
+      "n": 106,
+      "MVR": 9.4
+    },
+    "MR-P": {
+      "n": 82,
+      "MVR": 9.8
+    },
+    "MR-S": {
+      "n": 38,
+      "MVR": 10.5
+    }
+  }
+}

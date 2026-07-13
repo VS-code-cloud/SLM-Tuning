@@ -1,0 +1,52 @@
+[
+  {
+    "removed": "logiqa-10432",
+    "added": "logiqa-evalclean-tr-1808",
+    "new_gold": "The management characteristics of the Internet"
+  },
+  {
+    "removed": "logiqa-1819",
+    "added": "logiqa-evalclean-tr-5090",
+    "new_gold": "The perpetrator obtained the bill by fraud, but the debtor o"
+  },
+  {
+    "removed": "logiqa-2987",
+    "added": "logiqa-evalclean-tr-2618",
+    "new_gold": "All people love beauty, and some of them study science. Aris"
+  },
+  {
+    "removed": "logiqa-4650",
+    "added": "logiqa-evalclean-tr-2935",
+    "new_gold": "Mr. Wang, the department manager, has outstanding performanc"
+  },
+  {
+    "removed": "logiqa-4689",
+    "added": "logiqa-evalclean-tr-10140",
+    "new_gold": "To find out the proportion of patients with pancreatic cance"
+  },
+  {
+    "removed": "logiqa-8518",
+    "added": "logiqa-evalclean-tr-2669",
+    "new_gold": "The biggest problem with e-learning machines is to allow par"
+  },
+  {
+    "removed": "logiqa-9141",
+    "added": "logiqa-evalclean-tr-8615",
+    "new_gold": "New study shows dietary treatments, probiotics, etc. do not "
+  },
+  {
+    "removed": "logiqa-9182",
+    "added": "logiqa-evalclean-tr-5699",
+    "new_gold": "Mobile phone users have the habit of browsing mobile phones"
+  },
+  {
+    "removed": "logiqa-repl-126",
+    "added": "logiqa-evalclean-tr-510",
+    "new_gold": "East Asians are used to evaluating themselves negatively, wh"
+  },
+  {
+    "removed": "logiqa-repl-157",
+    "added": "logiqa-evalclean-tr-3368",
+    "new_gold": "Random nicknames, recommend worst and so on."
+  }
+]
