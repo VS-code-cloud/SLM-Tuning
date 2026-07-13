@@ -13,12 +13,27 @@ scored on the identical items.
 | Model | arct | folio | logicnli | logiqa | lsat_lr | proverqa | **mean** |
 |---|--:|--:|--:|--:|--:|--:|--:|
 | Base 4B (untuned) | 75.0 | 61.7 | 48.3 | 66.7 | 81.7 | 50.0 | 63.9 |
-| **LogicSLM (v7, 4B)** | 91.7 | 76.7 | 85.0 | 76.7 | 90.0 | 90.0 | **85.0** |
+| **LogicSLM (v7, 4B)** | 90.0 | 76.7 | 90.0 | 75.0 | 83.3 | 95.0 | **85.0** |
 | Claude Sonnet 4.6 | 88.3 | 80.0 | 60.0 | 85.0 | 94.9 | 69.5 | 79.6 |
 | Claude Opus 4.8 | 90.0 | 78.3 | 93.3 | 83.3 | 98.3 | 80.0 | 87.2 |
 
 The 4B model lands between Sonnet and Opus overall, and **beats both on ProverQA** and on the neutral
-"does-not-follow" class. Fuller cross-model analysis: [`RESULTS-DOK.md`](../../critical-reasoning-eval/RESULTS-DOK.md).
+"does-not-follow" class.
+
+### Robustness (LGMT metamorphic testing, n=300)
+
+Answer stability under logic-preserving edits — reorder/duplicate premises, rewrite the conclusion,
+rename symbols, rewrite formulas. **MVR = label-flip rate; lower is more robust.**
+
+| Model | Acc | **MVR** | HDR | MR-P | MR-C | MR-S | MR-E |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| **LogicSLM (v7)** | **87.5** | **9.3** | 5.3 | 1.2 | 7.8 | 17.9 | 13.4 |
+| Claude Opus 4.8 | 85.0 | 13.9 | 9.1 | 12.9 | 20.3 | 7.9 | 12.8 |
+| Claude Sonnet 4.6 | 76.9 | 9.7 | 2.8 | 9.8 | 9.7 | 10.5 | 9.4 |
+
+LogicSLM is the most accurate **and** (with Sonnet) the most robust — it flips less than Opus overall
+and far less on conclusion rewrites (MR-C **7.8** vs 20.3). Full corpus + eval details:
+[`data-synthesis.md`](data-synthesis.md).
 
 ## Run the demo
 

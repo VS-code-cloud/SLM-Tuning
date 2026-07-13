@@ -2,7 +2,14 @@ export default function Hero() {
   return (
     <header className="hero">
       <nav className="nav">
-        <span className="nav__brand">LogicSLM</span>
+        <span className="nav__brand">
+          <svg className="nav__mark" viewBox="0 0 64 64" width="20" height="20" aria-hidden="true">
+            <circle cx="32" cy="20" r="7" />
+            <circle cx="20" cy="44" r="7" />
+            <circle cx="44" cy="44" r="7" />
+          </svg>
+          LogicSLM
+        </span>
         <div className="nav__links">
           <a href="#use">For the classroom</a>
           <a href="#how">How it works</a>

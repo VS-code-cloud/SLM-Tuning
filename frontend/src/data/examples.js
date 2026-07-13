@@ -1,57 +1,60 @@
-// Compare-tool presets. Each is a logically/semantically structured EQUIVALENT of a
-// held-out eval item where Claude Opus 4.8 answered incorrectly but the tuned LogicSLM
-// answered correctly (sources: ProverQA multi-step, and the neutral "does-not-follow"
-// class across FOLIO/LogicNLI/ProverQA). The surface content is re-themed for school /
-// debate; the logical form and gold label are preserved. `demonstrates` describes the
-// form and the typical frontier failure mode — not a guarantee of any model's output.
+// Compare-tool presets, verified live against the deployed model.
+//   1-2 are straightforward cases (increasing difficulty) that ALL THREE models get right —
+//       baseline competence, so the tool isn't only cherry-picked wins.
+//   3-4 are held-out eval items where LogicSLM answers correctly but BOTH Claude Opus 4.8 and
+//       Sonnet 4.6 miss. (Hand-written "clean" equivalents of these don't hold up — the frontier
+//       solves the tidied version — so 3-4 use the real items verbatim.)
 export const EXAMPLES = [
   {
-    id: 'elimination-chain',
-    title: 'Elimination chain',
-    context: 'Policy debate',
-    demonstrates: 'Stacked exclusive-ors resolve by elimination → True. Frontier models often retreat to Unknown.',
+    id: 'clear-cut',
+    title: 'A clear-cut deduction',
+    context: 'Essay sourcing',
+    demonstrates: 'A straightforward valid inference — all three models agree it is True. Not every question is a hard case; on clear ones LogicSLM simply matches the frontier.',
     premises: [
-      'Every proposal is either funded or shelved, but not both.',
-      'Any funded proposal is either piloted this year or deferred to the next review, but not both.',
-      'The transit proposal is not shelved.',
-      'The transit proposal is not deferred to the next review.',
+      'Every source cited in the essay is a peer-reviewed study.',
+      'The Lindqvist paper is cited in the essay.',
     ],
-    conclusion: 'The transit proposal is piloted this year.',
+    conclusion: 'The Lindqvist paper is a peer-reviewed study.',
   },
   {
-    id: 'similar-terms',
-    title: 'Similar-sounding terms',
-    context: 'History essay',
-    demonstrates: 'One term is fixed; the other is never linked to the actor → Unknown. Frontier models often over-commit to False.',
+    id: 'dense-constraints',
+    title: 'A dense web of constraints',
+    context: 'Constraint reasoning',
+    demonstrates: 'Several interlocking rules that resolve only by elimination — harder than a one-step inference, but all three models still reach it (True).',
     premises: [
-      'The historian Alcott popularized the term "oppidum" for a large fortified Iron Age town.',
-      'A "castellum" is not a town but a small Roman fort.',
+      'Each team is seeded either high or low, but not both.',
+      'Every high-seeded team receives a first-round bye.',
+      'No team with a first-round bye plays on opening night.',
+      'The Foxes are seeded high or low.',
+      'The Foxes play on opening night.',
     ],
-    conclusion: 'Alcott popularized the term "castellum".',
+    conclusion: 'The Foxes are seeded low.',
   },
   {
-    id: 'entailed-opposite',
-    title: 'Entailed opposite',
-    context: 'Source analysis',
-    demonstrates: 'A short chain entails the negation of the claim → False, not merely "unclear".',
+    id: 'unstated-region',
+    title: 'Only one case is pinned down',
+    context: 'Does it follow?',
+    demonstrates: 'The premises fix the Picuris range to New Mexico, but say nothing about whether Juan visited any Texas range — so it does not follow (Unknown). Opus and Sonnet over-commit to False; LogicSLM holds the line.',
     premises: [
-      'Every primary source in the collection was written before 1850.',
-      'Anything written before 1850 predates the railway era.',
-      'The Fenwick diary is a primary source in the collection.',
+      'The Picuris Mountains are a mountain range in New Mexico or Texas.',
+      'Juan de Onate visited the Picuris Mountains.',
+      'The Harding Pegmatite Mine, located in the Picuris Mountains, was donated.',
+      'There are no mountain ranges in Texas that have mines which have been donated.',
     ],
-    conclusion: 'The Fenwick diary was written during the railway era.',
+    conclusion: 'Juan de Onate visited a mountain range in Texas.',
   },
   {
-    id: 'unstated-category',
-    title: 'A claim about the other category',
-    context: 'Archival research',
-    demonstrates: 'The premises pin down one item; the claim asserts something about a category that is never established → Unknown. Frontier models over-commit to False here.',
+    id: 'conditional-chain',
+    title: 'Follow the conditionals through',
+    context: 'Deductive chain',
+    demonstrates: 'A chain of conditionals actually settles it — the conclusion is True. Opus and Sonnet retreat to "Unknown"; LogicSLM commits.',
     premises: [
-      'The Verel Codex was produced in either the northern or the southern scriptorium.',
-      'Brother Anselm studied the Verel Codex.',
-      'The Verel Codex is written in gold ink.',
-      'No manuscript from the southern scriptorium is written in gold ink.',
+      'If people own at least one pet, then they do not have tidy houses.',
+      'If people grew up with childhood pets, then they own at least one pet.',
+      'If people hire a maid or cleaning service, then they have tidy houses.',
+      'If people live in the suburbs, then they have tidy houses.',
+      'Jack either does not hire a maid or cleaning service or, if he does, then he does not own at least one pet.',
     ],
-    conclusion: 'Brother Anselm studied a manuscript from the southern scriptorium.',
+    conclusion: 'Jack does not live in the suburbs.',
   },
 ]

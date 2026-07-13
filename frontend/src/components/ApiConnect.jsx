@@ -47,7 +47,7 @@ export default function ApiConnect({ onStatus }) {
         {status === 'ok' && <span className="ok-text">● {detail}</span>}
         {status === 'down' && <span className="down-text">● {detail} — check the URL and that the notebook cell is running</span>}
         {status === 'checking' && <span>● checking…</span>}
-        {status === 'unknown' && <span>Paste the ngrok URL printed by the server notebook, then Connect.</span>}
+        {status === 'unknown' && <span>Paste the ngrok or trycloudflare URL printed by the server notebook, then Connect.</span>}
       </p>
     </div>
   )

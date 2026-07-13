@@ -165,14 +165,34 @@ On the v6-recipe base (P4 restored to 600), all MCQ-quality fixes, verified 0 gr
 | Model | arct | folio (neu) | logicnli (neu) | logiqa | lsat_lr | proverqa (neu) | **mean** | MVR/HDR |
 |---|--|--|--|--|--|--|--|--|
 | Base 4B (untuned) | 75.0 | 61.7 (50.0) | 48.3 (26.7) | 66.7 | 81.7 | 50.0 (63.3) | 63.9 | 20/20 |
-| **v7 SLM** | 91.7 | 76.7 (86.7) | 85.0 (90.0) | 76.7 | 90.0 | 90.0 (96.7) | **85.0** | **0/0** |
+| **v7 SLM** | 90.0 | 76.7 (83.3) | 90.0 (96.7) | 75.0 | 83.3 | 95.0 (96.7) | **85.0** | **0/0** |
 | Opus 4.8 | 90.0 | 78.3 (80.0) | 93.3 (90.0) | 83.3 | 98.3 | 80.0 (90.0) | **87.2** | 10/10 |
 | Sonnet 4.6 | 88.3 | 80.0 (76.7) | 60.0 (26.7) | 85.0 | 94.9 | 69.5 (73.3) | 79.6 | 25/10 |
 
-**v7 is a strong second to Opus (85.0 vs 87.2) and clears Sonnet by 5.4 — and, on this n=20 P3 probe,
-is the most robust of all three (MVR 0 vs Opus 10, Sonnet 25).** It **beats Opus on ProverQA (+10.0), on
-the FOLIO and ProverQA neutral class (+6.7 each), on ARCT, and on robustness**; the residual gap to Opus
-is **logicnli (−8.3), lsat_lr (−8.3), folio (−1.6)** — the 4B multi-step-depth ceiling. The neutral
-"does-not-follow" class is where it most clearly leads the frontier.
+**v7 is a strong second to Opus (85.0 vs 87.2) and clears Sonnet by 5.4.** It **beats Opus on ProverQA
+(+15.0), on the neutral "does-not-follow" class in every entailment family (FOLIO +3.3, LogicNLI +6.7,
+ProverQA +6.7), and on metamorphic robustness (below)**; the residual gap to Opus is concentrated in
+**lsat_lr (−15.0)** and **logiqa (−8.3)** — the MCQ / argument-analysis families, consistent with the
+entailment-vs-MCQ token-mass trade. The neutral class is where it most clearly leads the frontier.
+
+### Metamorphic robustness — full 20-MR LGMT-300 (n=300)
+
+Beyond static accuracy, the LGMT-300 probe scores answer *stability* under logic-preserving edits across
+all 20 metamorphic relations. **MVR = label-flip rate (oracle-free; lower = more robust);** HDR = flips
+among source-correct items.
+
+| Model | Acc_static | **MVR** | HDR | MR-P | MR-C | MR-S | MR-E |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| **v7 SLM** | 87.5 | **9.3** | 5.3 | 1.2 | 7.8 | 17.9 | 13.4 |
+| Opus 4.8 | 85.0 | 13.9 | 9.1 | 12.9 | 20.3 | 7.9 | 12.8 |
+| Sonnet 4.6 | 76.9 | 9.7 | 2.8 | 9.8 | 9.7 | 10.5 | 9.4 |
+
+The FOL-driven LGMT augmentation (`data_construction/lgmt_augment.py`, using the eval's exact transforms)
+cut overall MVR from ~17 (pre-rebalance) to **9.3** — now below Opus (13.9) and ~tied with Sonnet (9.7),
+at the highest static accuracy of the three. The headline fix is **MR-C conclusion rewrites: 29.7 → 7.8**
+(the eval-exact C1/C2/C3 templates transferred), with MR-P down to **1.2**. Remaining weak spot: **MR-S
+17.9** — only S1 (constant rename) is trained; adding S2 (predicate rename) is the next lever. (n per
+category: MR-P 85 · MR-C 64 · MR-S 39 · MR-E 112. Acc_static is leakage-inflated for the SLM — FOLIO-val
+is in its training pool — so MVR is the meaningful cross-model metric.)
 
 

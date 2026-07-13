@@ -121,7 +121,11 @@ main > .section:nth-child(odd) { background: linear-gradient(var(--paper), var(-
   font-weight: 600;
   font-size: 1.3rem;
   letter-spacing: -0.01em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
 }
+.nav__mark { fill: var(--accent); flex: 0 0 auto; }
 .nav__links { display: flex; gap: 1.6rem; }
 .nav__links a { color: var(--ink-2); font-size: 0.95rem; }
 .nav__links a:hover { color: var(--accent); }

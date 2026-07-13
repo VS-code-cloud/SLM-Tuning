@@ -1,4 +1,4 @@
-import { RESULTS, RESULTS_NOTE, NEUTRAL, NEUTRAL_NOTE } from '../data/results.js'
+import { RESULTS, RESULTS_NOTE, NEUTRAL, NEUTRAL_NOTE, ROBUSTNESS, ROBUSTNESS_NOTE } from '../data/results.js'
 
 export default function HowItWorks() {
   const max = Math.max(...RESULTS.map((r) => r.acc))
@@ -69,6 +69,32 @@ export default function HowItWorks() {
                   {r.slm === r.opus && <span className="pill pill--tie">tie</span>}
                 </td>
                 <td className="neutral__opus">{r.opus.toFixed(1)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="neutral">
+        <div className="neutral__head">
+          <h3 className="neutral__title">…and staying consistent when a problem is reworded</h3>
+          <p className="neutral__note">{ROBUSTNESS_NOTE}</p>
+        </div>
+        <table className="neutral__table">
+          <thead>
+            <tr>
+              <th scope="col">Answer flip-rate (lower is better)</th>
+              <th scope="col">MVR</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ROBUSTNESS.map((r) => (
+              <tr key={r.model} className={r.highlight ? 'beats' : ''}>
+                <th scope="row">{r.model}</th>
+                <td className="neutral__slm">
+                  {r.mvr.toFixed(1)}%
+                  {r.highlight && <span className="pill">most robust</span>}
+                </td>
               </tr>
             ))}
           </tbody>
