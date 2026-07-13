@@ -8,14 +8,15 @@ students do: argumentative essays (history, language arts) and debate.
 ## Results
 
 Held-out accuracy across six logical-reasoning families (n=60/family, greedy decode). Frontier models
-scored on the identical items.
+scored on the identical items. Parentheses = **neutral ("does-not-follow") recall** on the three
+entailment families — the hardest class, where frontier models most often over-commit.
 
-| Model | arct | folio | logicnli | logiqa | lsat_lr | proverqa | **mean** |
+| Model | lsat_lr | logiqa | arct | folio (neu) | logicnli (neu) | proverqa (neu) | **mean** |
 |---|--:|--:|--:|--:|--:|--:|--:|
-| Base 4B (untuned) | 75.0 | 61.7 | 48.3 | 66.7 | 81.7 | 50.0 | 63.9 |
-| **LogicSLM (v7, 4B)** | 90.0 | 76.7 | 90.0 | 75.0 | 83.3 | 95.0 | **85.0** |
-| Claude Sonnet 4.6 | 88.3 | 80.0 | 60.0 | 85.0 | 94.9 | 69.5 | 79.6 |
-| Claude Opus 4.8 | 90.0 | 78.3 | 93.3 | 83.3 | 98.3 | 80.0 | 87.2 |
+| Base 4B (untuned) | 81.7 | 66.7 | 75.0 | 61.7 (50.0) | 48.3 (26.7) | 50.0 (63.3) | 63.9 |
+| **LogicSLM (v7, 4B)** | 83.3 | 75.0 | 90.0 | 76.7 (83.3) | 90.0 (96.7) | 95.0 (96.7) | 85.0 |
+| Claude Sonnet 4.6 | 94.9 | 85.0 | 88.3 | 80.0 (76.7) | 60.0 (26.7) | 69.5 (73.3) | 79.6 |
+| Claude Opus 4.8 | 98.3 | 83.3 | 90.0 | 78.3 (80.0) | 93.3 (90.0) | 80.0 (90.0) | 87.2 |
 
 The 4B model lands between Sonnet and Opus overall, and **beats both on ProverQA** and on the neutral
 "does-not-follow" class.
@@ -27,7 +28,7 @@ rename symbols, rewrite formulas. **MVR = label-flip rate; lower is more robust.
 
 | Model | Acc | **MVR** | HDR | MR-P | MR-C | MR-S | MR-E |
 |---|--:|--:|--:|--:|--:|--:|--:|
-| **LogicSLM (v7)** | **87.5** | **9.3** | 5.3 | 1.2 | 7.8 | 17.9 | 13.4 |
+| **LogicSLM (v7)** | 87.5 | 9.3 | 5.3 | 1.2 | 7.8 | 17.9 | 13.4 |
 | Claude Opus 4.8 | 85.0 | 13.9 | 9.1 | 12.9 | 20.3 | 7.9 | 12.8 |
 | Claude Sonnet 4.6 | 76.9 | 9.7 | 2.8 | 9.8 | 9.7 | 10.5 | 9.4 |
 

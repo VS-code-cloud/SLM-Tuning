@@ -107,28 +107,28 @@ replacing shallow move-naming templates; ~3,175 in `mcq_stepb_review.jsonl`.
 | Variant | Change | eval | notes |
 |---|---|--:|---|
 | base / v1-long | leakage fix + rebuild; 478 ReClor-shared LogiQA replaced | 81.4 | long MCQ traces → MCQ 62% of tokens, crowds entailment |
-| **shortened** | MCQ traces compressed to ~4 sentences (MCQ 62→44%) | **85.3** | best on the old eval; robustness worst (MVR 20) |
+| **shortened** | MCQ traces compressed to ~4 sentences (MCQ 62→44%) | 85.3 | best on the old eval; robustness worst (MVR 20) |
 | v2 | 4-phase gap-closer (P1 elim, P2 folio-up, P3 deepen, P4 irr-aug) | 82.8 | P2 helps (folio-neu +20); P1/P3 hurt |
 | v3 | lsat_lr-elim (trimmed) + P4 | 81.7 | elim underperforms shortened on lsat_lr |
 | v4 | P2 + P4 on shortened | 83.9 | logiqa fell to 66.7 — P2/P4 dilute logiqa's share |
 | v5 | v4 + logiqa Opus-elim swap | 82.8 | elim did **not** recover logiqa (68.3) → decline is mix-share dilution, not trace content |
 | v6 | +300 fresh logiqa, ensemble bad-gold drop (92), P4 600→300 | 83.3 | logiqa recovered 71.7 (share 13.2→15.9%); P4 cut → MVR 15/HDR 10 |
-| **v7** | v6-recipe (P4=600) + full MCQ cleanup (below), on the clean eval | **85.3** | ties peak accuracy **and** best-ever robustness (**MVR 0/0**); best logiqa 80.0, lsat_lr 91.7, proverqa 93.3 |
+| **v7** | v6-recipe (P4=600) + full MCQ cleanup (below), on the clean eval | 85.3 | ties peak accuracy and best-ever robustness (MVR 0/0); best logiqa 80.0, lsat_lr 91.7, proverqa 93.3 |
 
 ### Results — old eval (bf16 Qwen3.5-4B, tuned acc, n=60/family; neutral-recall in parens; MVR/HDR from n=20 P3 probe)
 
-| Model | arct | folio (neu) | logicnli (neu) | logiqa | lsat_lr | proverqa (neu) | **mean** | MVR/HDR |
+| Model | lsat_lr | logiqa | arct | folio (neu) | logicnli (neu) | proverqa (neu) | **mean** | MVR/HDR |
 |---|---|---|---|---|---|---|---|---|
-| base (untuned) | 75.0 | 61.7 (50.0) | 48.3 (26.7) | 65.0 | 81.7 | 50.0 (63.3) | 63.6 | 20/20 |
-| **shortened** | 93.3 | 73.3 (66.7) | 88.3 (96.7) | 78.3 | 86.7 | 91.7 (100) | **85.3** | 20/20 |
-| v2 | 90.0 | 71.7 (**86.7**) | 83.3 (86.7) | 80.0 | 81.7 | 90.0 (100) | 82.8 | **0/0** |
-| v3 | 88.3 | 68.3 (66.7) | 85.0 (96.7) | 68.3 | 85.0 | 95.0 (93.3) | 81.7 | 5/5 |
-| v1-long | 91.7 | 65.0 (66.7) | 85.0 (96.7) | 68.3 | **90.0** | 88.3 (96.7) | 81.4 | 5/5 |
-| v4 | 93.3 | 75.0 (**83.3**) | 85.0 (86.7) | **66.7** | **90.0** | 93.3 (96.7) | 83.9 | **5/0** |
-| v5 | 91.7 | 75.0 (83.3) | 86.7 (96.7) | 68.3 | 85.0 | 90.0 (96.7) | 82.8 | **5/0** |
-| v6 | 91.7 | 75.0 (86.7) | 86.7 (90.0) | **71.7** | 85.0 | 90.0 (96.7) | 83.3 | 15/10 |
-| Sonnet 4.6 (ref) | 88.3 | 75.0 (76.7) | 63.3 (30.0) | 81.7 | 96.6 | 69.5 (73.3) | 79.1 | 15/10 |
-| **Opus 4.8** (ref) | 95.0 | 76.7 (76.7) | 95.0 (93.3) | 83.3 | 100 | 81.4 (93.3) | **88.5** | 10/10 |
+| base (untuned) | 81.7 | 65.0 | 75.0 | 61.7 (50.0) | 48.3 (26.7) | 50.0 (63.3) | 63.6 | 20/20 |
+| **shortened** | 86.7 | 78.3 | 93.3 | 73.3 (66.7) | 88.3 (96.7) | 91.7 (100) | 85.3 | 20/20 |
+| v2 | 81.7 | 80.0 | 90.0 | 71.7 (86.7) | 83.3 (86.7) | 90.0 (100) | 82.8 | 0/0 |
+| v3 | 85.0 | 68.3 | 88.3 | 68.3 (66.7) | 85.0 (96.7) | 95.0 (93.3) | 81.7 | 5/5 |
+| v1-long | 90.0 | 68.3 | 91.7 | 65.0 (66.7) | 85.0 (96.7) | 88.3 (96.7) | 81.4 | 5/5 |
+| v4 | 90.0 | 66.7 | 93.3 | 75.0 (83.3) | 85.0 (86.7) | 93.3 (96.7) | 83.9 | 5/0 |
+| v5 | 85.0 | 68.3 | 91.7 | 75.0 (83.3) | 86.7 (96.7) | 90.0 (96.7) | 82.8 | 5/0 |
+| v6 | 85.0 | 71.7 | 91.7 | 75.0 (86.7) | 86.7 (90.0) | 90.0 (96.7) | 83.3 | 15/10 |
+| Sonnet 4.6 (ref) | 96.6 | 81.7 | 88.3 | 75.0 (76.7) | 63.3 (30.0) | 69.5 (73.3) | 79.1 | 15/10 |
+| **Opus 4.8** (ref) | 100 | 83.3 | 95.0 | 76.7 (76.7) | 95.0 (93.3) | 81.4 (93.3) | 88.5 | 10/10 |
 
 Reads: every tuned SLM beats Sonnet (79.1); the 4B sits between Sonnet and Opus (88.5), within 3.2.
 It **beats both frontier models on proverqa** and on neutral recall (Sonnet collapses on
@@ -162,12 +162,12 @@ On the v6-recipe base (P4 restored to 600), all MCQ-quality fixes, verified 0 gr
 **Results — clean eval (v7 vs frontier, apples-to-apples, n=60/family):** all three run on
 `eval_items_clean.json`; frontier via `opus_eval.py --eval-file`.
 
-| Model | arct | folio (neu) | logicnli (neu) | logiqa | lsat_lr | proverqa (neu) | **mean** | MVR/HDR |
+| Model | lsat_lr | logiqa | arct | folio (neu) | logicnli (neu) | proverqa (neu) | **mean** | MVR/HDR |
 |---|--|--|--|--|--|--|--|--|
-| Base 4B (untuned) | 75.0 | 61.7 (50.0) | 48.3 (26.7) | 66.7 | 81.7 | 50.0 (63.3) | 63.9 | 20/20 |
-| **v7 SLM** | 90.0 | 76.7 (83.3) | 90.0 (96.7) | 75.0 | 83.3 | 95.0 (96.7) | **85.0** | **0/0** |
-| Opus 4.8 | 90.0 | 78.3 (80.0) | 93.3 (90.0) | 83.3 | 98.3 | 80.0 (90.0) | **87.2** | 10/10 |
-| Sonnet 4.6 | 88.3 | 80.0 (76.7) | 60.0 (26.7) | 85.0 | 94.9 | 69.5 (73.3) | 79.6 | 25/10 |
+| Base 4B (untuned) | 81.7 | 66.7 | 75.0 | 61.7 (50.0) | 48.3 (26.7) | 50.0 (63.3) | 63.9 | 20/20 |
+| **v7 SLM** | 83.3 | 75.0 | 90.0 | 76.7 (83.3) | 90.0 (96.7) | 95.0 (96.7) | 85.0 | 0/0 |
+| Opus 4.8 | 98.3 | 83.3 | 90.0 | 78.3 (80.0) | 93.3 (90.0) | 80.0 (90.0) | 87.2 | 10/10 |
+| Sonnet 4.6 | 94.9 | 85.0 | 88.3 | 80.0 (76.7) | 60.0 (26.7) | 69.5 (73.3) | 79.6 | 25/10 |
 
 **v7 is a strong second to Opus (85.0 vs 87.2) and clears Sonnet by 5.4.** It **beats Opus on ProverQA
 (+15.0), on the neutral "does-not-follow" class in every entailment family (FOLIO +3.3, LogicNLI +6.7,
@@ -183,7 +183,7 @@ among source-correct items.
 
 | Model | Acc_static | **MVR** | HDR | MR-P | MR-C | MR-S | MR-E |
 |---|--:|--:|--:|--:|--:|--:|--:|
-| **v7 SLM** | 87.5 | **9.3** | 5.3 | 1.2 | 7.8 | 17.9 | 13.4 |
+| **v7 SLM** | 87.5 | 9.3 | 5.3 | 1.2 | 7.8 | 17.9 | 13.4 |
 | Opus 4.8 | 85.0 | 13.9 | 9.1 | 12.9 | 20.3 | 7.9 | 12.8 |
 | Sonnet 4.6 | 76.9 | 9.7 | 2.8 | 9.8 | 9.7 | 10.5 | 9.4 |
 
