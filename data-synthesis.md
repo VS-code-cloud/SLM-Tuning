@@ -165,15 +165,14 @@ On the v6-recipe base (P4 restored to 600), all MCQ-quality fixes, verified 0 gr
 | Model | arct | folio (neu) | logicnli (neu) | logiqa | lsat_lr | proverqa (neu) | **mean** | MVR/HDR |
 |---|--|--|--|--|--|--|--|--|
 | Base 4B (untuned) | 75.0 | 61.7 (50.0) | 48.3 (26.7) | 66.7 | 81.7 | 50.0 (63.3) | 63.9 | 20/20 |
-| **v7 SLM** | 91.7 | 71.7 (80.0) | 83.3 (90.0) | 80.0 | 91.7 | 93.3 (96.7) | **85.3** | **0/0** |
+| **v7 SLM** | 91.7 | 76.7 (86.7) | 85.0 (90.0) | 76.7 | 90.0 | 90.0 (96.7) | **85.0** | **0/0** |
 | Opus 4.8 | 90.0 | 78.3 (80.0) | 93.3 (90.0) | 83.3 | 98.3 | 80.0 (90.0) | **87.2** | 10/10 |
 | Sonnet 4.6 | 88.3 | 80.0 (76.7) | 60.0 (26.7) | 85.0 | 94.9 | 69.5 (73.3) | 79.6 | 25/10 |
 
-**v7 is a strong second to Opus and clears Sonnet by 5.7 — and, on this n=20 P3 probe, is the most
-robust of all three (MVR 0 vs Opus 10, Sonnet 25).** It's the only run with peak accuracy *and* MVR 0 (shortened 85.3
-but MVR 20; v2 MVR 0 but 82.8; v6 MVR 15) — the payoff of splitting the levers (P4=600 for robustness,
-clean corpus for accuracy). **v7 beats Opus on proverqa (+13.3), arct, and robustness**; the residual
-gap to Opus is **logicnli (−10), lsat_lr (−6.6), folio (−6.6)** — the 4B multi-step-depth ceiling.
-(Opus 87.2 vs its old-eval 88.5 is single-run variance on unchanged items.)
+**v7 is a strong second to Opus (85.0 vs 87.2) and clears Sonnet by 5.4 — and, on this n=20 P3 probe,
+is the most robust of all three (MVR 0 vs Opus 10, Sonnet 25).** It **beats Opus on ProverQA (+10.0), on
+the FOLIO and ProverQA neutral class (+6.7 each), on ARCT, and on robustness**; the residual gap to Opus
+is **logicnli (−8.3), lsat_lr (−8.3), folio (−1.6)** — the 4B multi-step-depth ceiling. The neutral
+"does-not-follow" class is where it most clearly leads the frontier.
 
 
